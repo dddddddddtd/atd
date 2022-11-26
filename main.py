@@ -29,25 +29,8 @@ dmu_count = len(dmus)
 input_count = inputs.shape[1]
 output_count = outputs.shape[1]
 
-
 def make_affine(param, values):
     return pulp.LpAffineExpression(list(zip(param.values(), values)))
-
-
-def make_dmu_problem(dmu, inputs, outputs):
-    dmu_problem = pulp.LpProblem(f'DMU_{dmu}', pulp.LpMaximize)
-
-    v = pulp.LpVariable.dicts("v", list(range(1, input_count + 1)), 0)
-    u = pulp.LpVariable.dicts("u", list(range(1, output_count + 1)), 0)
-
-    dmu_problem += pulp.LpAffineExpression(list(zip(u.values(), outputs[dmu, :])))
-    dmu_problem += pulp.LpAffineExpression(list(zip(v.values(), inputs[dmu, :]))) == 1
-
-    for x in range(dmu_count):
-        dmu_problem += make_affine(u, outputs[x, :]) <= make_affine(v, inputs[x, :])
-
-    return dmu_problem
-
 
 def solve_hcu(dmu, inputs, outputs):
     hcu_problem = pulp.LpProblem(f'DMU_{dmu}', pulp.LpMinimize)
@@ -68,7 +51,7 @@ def solve_hcu(dmu, inputs, outputs):
     lambda_values.sort(key=lambda x: int(x[0]))
     lambda_values = np.array([x[1] for x in lambda_values])
     xhcu = (inputs.T * lambda_values).sum(1)
-    return hcu_problem, xhcu
+    return hcu_problem.objective.value(), xhcu
 
 np.set_printoptions(precision=2)
 
@@ -77,10 +60,11 @@ for i, dmu in enumerate(dmus):
     solution_hcu[dmu] = solve_hcu(i, inputs, outputs)
 
 for i, dmu in enumerate(dmus):
-    print(f'{dmu} & {np.round(solution_hcu[dmu][0].objective.value(), 2)} \\\\')
+    print(f'{dmu} & {np.round(solution_hcu[dmu][0], 2)} \\\\')
 
+print()
 for i, dmu in enumerate(dmus):
-    if solution_hcu[dmu][0].objective.value() < 1:
+    if solution_hcu[dmu][0] < 1:
         hcu = solution_hcu[dmu][1]
         print(
             f'{dmu} & {" & ".join(list(np.round(hcu, 2).astype(str)))} & {" & ".join(list(np.round(inputs[i] - hcu, 2).astype(str)))} \\\\')
